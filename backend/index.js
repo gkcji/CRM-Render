@@ -1317,7 +1317,7 @@ app.listen(port, '0.0.0.0', () => {
 
   // --- CRON JOBS FOR SCHEDULED MAILS ---
   // Runs every day at 09:00 AM
-  cron.schedule('0 9 * * *', () => {
+  cron.schedule('0 9 * * *', async () => {
     console.log('[Cron] Running Daily Due Reminders check...');
     try {
       const pendingTasks = await db.prepare("SELECT t.*, l.name as lead_name, l.assigned_to FROM tasks t JOIN leads l ON t.lead_id = l.id WHERE t.completed = 0 AND date(t.due_date) <= date('now')").all();
