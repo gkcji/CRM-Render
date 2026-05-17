@@ -1298,7 +1298,7 @@ const frontendPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendPath));
 
 // Catch-all route to serve index.html for React Router
-app.get('*', async (req, res) => {
+app.use((req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 app.listen(port, '0.0.0.0', () => {
