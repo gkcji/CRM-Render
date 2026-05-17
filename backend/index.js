@@ -479,12 +479,9 @@ app.post('/api/custom-field-values/:entity_type/:entity_id', async (req, res) =>
   } = req.body; // { [field_id]: value }
   try {
     const upsert = db.prepare('INSERT INTO custom_field_values (field_id, entity_type, entity_id, value) VALUES (?, ?, ?, ?) ON CONFLICT(field_id, entity_type, entity_id) DO UPDATE SET value = excluded.value');
-    const saveAll = db.transaction(() => {
-      for (const [field_id, value] of Object.entries(values)) {
-        upsert.run(Number(field_id), entity_type, entity_id, value);
-      }
-    });
-    saveAll();
+    for (const [field_id, value] of Object.entries(values)) {
+      await upsert.run(Number(field_id), entity_type, entity_id, value);
+    }
     res.json({
       success: true
     });
@@ -863,24 +860,21 @@ app.post('/api/leads/bulk', async (req, res) => {
     const checkPhone = db.prepare('SELECT id FROM leads WHERE phone = ?');
     let imported = 0;
     const duplicates = [];
-    const insertMany = db.transaction(rows => {
-      for (const lead of rows) {
-        let isDup = false;
-        if (lead.email && checkEmail.get(lead.email)) {
-          isDup = true;
-        }
-        if (!isDup && lead.phone && checkPhone.get(lead.phone)) {
-          isDup = true;
-        }
-        if (isDup) {
-          duplicates.push(lead.name || lead.email || lead.phone);
-        } else {
-          insert.run(lead.name, lead.email, lead.phone, lead.company, lead.job_title, lead.city, lead.website, lead.notes, lead.source, lead.status || 'New', lead.lead_type || 'Calling', lead.industry, lead.service, lead.address, lead.pincode, lead.state, lead.country, lead.tags);
-          imported++;
-        }
+    for (const lead of incoming) {
+      let isDup = false;
+      if (lead.email && await checkEmail.get(lead.email)) {
+        isDup = true;
       }
-    });
-    insertMany(incoming);
+      if (!isDup && lead.phone && await checkPhone.get(lead.phone)) {
+        isDup = true;
+      }
+      if (isDup) {
+        duplicates.push(lead.name || lead.email || lead.phone);
+      } else {
+        await insert.run(lead.name, lead.email, lead.phone, lead.company, lead.job_title, lead.city, lead.website, lead.notes, lead.source, lead.status || 'New', lead.lead_type || 'Calling', lead.industry, lead.service, lead.address, lead.pincode, lead.state, lead.country, lead.tags);
+        imported++;
+      }
+    }
     res.status(201).json({
       success: true,
       imported,
@@ -934,27 +928,23 @@ app.get('/api/leads/export', async (req, res) => {
 app.delete('/api/leads/:id', authenticate, requireRole(['Admin', 'Manager']), async (req, res) => {
   try {
     const id = req.params.id;
-    const deleteLead = db.transaction(() => {
-      // Delete tasks linked to this lead
-      await db.prepare('DELETE FROM tasks WHERE lead_id = ?').run(id);
-      // Delete activities linked to this lead
-      await db.prepare('DELETE FROM activities WHERE lead_id = ?').run(id);
-      // Delete deal-level records for deals linked to this lead
-      const deals = await db.prepare('SELECT id FROM deals WHERE lead_id = ?').all(id);
-      for (const deal of deals) {
-        await db.prepare('DELETE FROM tasks WHERE deal_id = ?').run(deal.id);
-        await db.prepare('DELETE FROM activities WHERE deal_id = ?').run(deal.id);
-        // delete stage history if table exists
-        try {
-          await db.prepare('DELETE FROM deal_stage_history WHERE deal_id = ?').run(deal.id);
-        } catch (_) {}
-      }
-      // Delete deals linked to this lead
-      await db.prepare('DELETE FROM deals WHERE lead_id = ?').run(id);
-      // Finally delete the lead
-      await db.prepare('DELETE FROM leads WHERE id = ?').run(id);
-    });
-    deleteLead();
+    // Delete tasks linked to this lead
+    await db.prepare('DELETE FROM tasks WHERE lead_id = ?').run(id);
+    // Delete activities linked to this lead
+    await db.prepare('DELETE FROM activities WHERE lead_id = ?').run(id);
+    // Delete deal-level records for deals linked to this lead
+    const deals = await db.prepare('SELECT id FROM deals WHERE lead_id = ?').all(id);
+    for (const deal of deals) {
+      await db.prepare('DELETE FROM tasks WHERE deal_id = ?').run(deal.id);
+      await db.prepare('DELETE FROM activities WHERE deal_id = ?').run(deal.id);
+      try {
+        await db.prepare('DELETE FROM deal_stage_history WHERE deal_id = ?').run(deal.id);
+      } catch (_) {}
+    }
+    // Delete deals linked to this lead
+    await db.prepare('DELETE FROM deals WHERE lead_id = ?').run(id);
+    // Finally delete the lead
+    await db.prepare('DELETE FROM leads WHERE id = ?').run(id);
     res.json({
       success: true
     });
