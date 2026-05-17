@@ -264,7 +264,7 @@ app.delete('/api/custom-fields/:id', authenticate, requireRole('Admin'), async (
 
 // --- NOTIFICATIONS ROUTES ---
 // Helper to create a notification (used internally)
-function createNotif(db, {
+async function createNotif(db, {
   user_id = null,
   title,
   body = '',
