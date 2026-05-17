@@ -26,7 +26,6 @@ const menuItems = [
   { icon: CheckCircle2,    label: 'Tasks',         path: '/tasks',   color: '#f59e0b' },
   { icon: BarChart2,       label: 'Reports',       path: '/reports', color: '#ec4899', adminOnly: true },
   { icon: Shield,          label: 'Audit Log',     path: '/audit',   color: '#06b6d4', adminOnly: true },
-  { icon: Database,        label: 'Backup',        path: '/backup',  color: '#64748b', adminOnly: true },
   { icon: Settings,        label: 'Settings',      path: '/settings',color: '#94a3b8' },
 ];
 
